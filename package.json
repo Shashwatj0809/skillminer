@@ -1,0 +1,42 @@
+{
+  "name": "skillminer",
+  "version": "0.1.0",
+  "description": "Mine your local AI-agent logs (Claude Code, Codex, Claude Desktop exports) into reusable, provider-agnostic skills — global and per-repo — with privacy-first redaction and an MCP server mode.",
+  "type": "module",
+  "bin": {
+    "skillminer": "bin/skillminer.js"
+  },
+  "main": "src/index.js",
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "skills",
+    "claude",
+    "claude-code",
+    "codex",
+    "mcp",
+    "logs",
+    "mining",
+    "preferences",
+    "developer-tools"
+  ],
+  "author": "Shashwat Jha",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Shashwatj0809/skillminer.git"
+  }
+}
