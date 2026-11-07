@@ -8,8 +8,27 @@ import { analyzeConversations, groupByRepo } from "./core/analyze.js";
 import { buildGlobalSkills, buildRepoSkill, writeSkills } from "./core/skills.js";
 import { loadState, saveState, diffAgainstState, recordSeen } from "./core/state.js";
 import { llmConfigured, polishBullets } from "./core/llm.js";
+import { exportPack, importPack } from "./core/pack.js";
 
 export { loadAll, analyzeConversations, groupByRepo, buildGlobalSkills, buildRepoSkill, writeSkills };
+
+/** Bundle all generated skills into a portable .skillpack.json. */
+export function exportSkills({ outDir, file } = {}) {
+  const state = loadState();
+  const skillsDir = outDir ?? state.outDir ?? defaultOutDir();
+  const target = file ?? `skillminer-${new Date().toISOString().slice(0, 10)}.skillpack.json`;
+  return { skillsDir, ...exportPack(skillsDir, target) };
+}
+
+/** Import a .skillpack.json, merging (read + append, deduped) into local skills. */
+export function importSkills(file, { outDir } = {}) {
+  const state = loadState();
+  const skillsDir = outDir ?? state.outDir ?? defaultOutDir();
+  const result = importPack(file, skillsDir);
+  state.outDir = skillsDir;
+  saveState(state);
+  return { skillsDir, ...result };
+}
 
 export function defaultOutDir() {
   return path.join(os.homedir(), ".skillminer", "skills");

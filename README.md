@@ -8,6 +8,7 @@ Every session you run with Claude Code, Codex, or Claude Desktop leaves a trail 
 - 🔒 **Privacy-first** — everything runs locally. Emails, API keys, tokens, phone numbers, IPs, private keys, and home paths are redacted *before* analysis; skills carry your **requirements, never your data**.
 - 📁 **Repo-aware** — builds a `project-context` skill for each repo using only the sessions that ran inside that repo.
 - 🔁 **Improvable** — `skillminer improve` folds new sessions into existing skills, merging instead of overwriting (your hand-added bullets survive).
+- 📦 **Portable** — `export` bundles all skills into a single `.skillpack.json`; `import` reads it on any other machine and appends into the local skills, deduplicated.
 - 🧰 **MCP server mode** — expose `scan_logs` / `list_repos` / `build_skills` / `improve_skills` as MCP tools so any MCP client (Claude Code, Claude Desktop, Cursor, Codex) can drive it.
 - 🪶 **Zero runtime dependencies** — plain Node ≥ 18.17.
 
@@ -85,7 +86,26 @@ skillminer improve
 
 Re-scans everything, reports how many session files are new or changed, and **merges** fresh findings into the existing skills. Merging is per-section, per-bullet: duplicates are dropped, and bullets you added by hand are preserved.
 
-### 7. Include Claude Desktop / claude.ai chats
+### 7. Move your skills to another machine
+
+Bundle everything into one portable file:
+
+```bash
+skillminer export
+# Exported 6 skill(s) from ~/.skillminer/skills
+# Pack: ./skillminer-2026-11-07.skillpack.json
+```
+
+Copy that file to the other machine (AirDrop, repo, cloud drive — it's a plain JSON file of your redacted skills, safe to move), then:
+
+```bash
+skillminer import skillminer-2026-11-07.skillpack.json
+# Imported pack: 3 new skill(s), 3 merged into existing ones.
+```
+
+Import is **read-and-append**: skills that don't exist yet are added; skills that do exist are merged bullet-by-bullet with what's already there — local knowledge and hand edits are never overwritten, and re-importing the same pack adds zero duplicates. Add `--install` to push the result straight into `~/.claude/skills`.
+
+### 8. Include Claude Desktop / claude.ai chats
 
 Claude Desktop stores chats server-side, so use the official export (**Settings → Privacy → Export data**), then:
 
@@ -95,7 +115,7 @@ skillminer build --import ~/Downloads/conversations.json
 
 (If a `conversations.json` is sitting in `~/Downloads`, it's picked up automatically.)
 
-### 8. Connect as an MCP server
+### 9. Connect as an MCP server
 
 ```bash
 # Claude Code
@@ -120,8 +140,10 @@ Then from inside any agent session: *"use skillminer to rebuild my skills for th
 | `list_repos` | Repos/directories with mineable history |
 | `build_skills` | Full build; optional `repo` and `outDir` arguments |
 | `improve_skills` | Merge new sessions into existing skills |
+| `export_skills` | Bundle skills into a portable `.skillpack.json` |
+| `import_skills` | Append a pack into local skills (merged, deduplicated) |
 
-### 9. Optional: LLM polish
+### 10. Optional: LLM polish
 
 Extraction is pure heuristics and fully offline. If you want the mined bullets rewritten into crisper instructions, opt in to a one-shot polish pass — only the already-redacted bullets are sent, never your logs:
 
@@ -146,6 +168,8 @@ skillminer scan                     Show providers, log locations, session count
 skillminer repos                    List repos with mineable history
 skillminer build [options]          Build global + per-repo skills
 skillminer improve [options]        Fold new sessions into existing skills
+skillminer export [--file <path>]   Bundle skills into a portable .skillpack.json
+skillminer import <file>            Append a pack into local skills (merged, deduplicated)
 skillminer mcp                      Run as an MCP stdio server
 
 --repo <path>      Scope the build to one repository

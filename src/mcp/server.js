@@ -9,7 +9,7 @@
  *   claude mcp add skillminer -- npx skillminer mcp
  */
 import readline from "node:readline";
-import { scan, build, improve, listRepos, defaultOutDir } from "../index.js";
+import { scan, build, improve, listRepos, exportSkills, importSkills, defaultOutDir } from "../index.js";
 
 const PROTOCOL_VERSION = "2024-11-05";
 
@@ -50,6 +50,33 @@ const TOOLS = [
       additionalProperties: false,
     },
   },
+  {
+    name: "export_skills",
+    description:
+      "Bundle all generated skills into a portable .skillpack.json file that can be imported on another machine.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string", description: "Where to write the pack (default ./skillminer-<date>.skillpack.json)." },
+        outDir: { type: "string", description: "Skills directory to export from (defaults to the last build's)." },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "import_skills",
+    description:
+      "Import a .skillpack.json into the local skills directory. Existing skills are merged (read + appended, deduplicated), never overwritten.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string", description: "Path to the .skillpack.json to import." },
+        outDir: { type: "string", description: "Skills directory to import into (defaults to the last build's)." },
+      },
+      required: ["file"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 async function callTool(name, args = {}) {
@@ -64,6 +91,10 @@ async function callTool(name, args = {}) {
       return await build({ repoFilter: args.repo, outDir: args.outDir });
     case "improve_skills":
       return await improve({ outDir: args.outDir });
+    case "export_skills":
+      return exportSkills({ outDir: args.outDir, file: args.file });
+    case "import_skills":
+      return importSkills(args.file, { outDir: args.outDir });
     default:
       throw new Error(`Unknown tool: ${name}`);
   }

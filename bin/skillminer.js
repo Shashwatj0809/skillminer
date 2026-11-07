@@ -12,7 +12,7 @@ import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
 import { parseArgs } from "node:util";
-import { scan, build, improve, listRepos, defaultOutDir } from "../src/index.js";
+import { scan, build, improve, listRepos, exportSkills, importSkills, defaultOutDir } from "../src/index.js";
 import { startMcpServer } from "../src/mcp/server.js";
 
 const HELP = `skillminer — mine your local AI-agent logs into reusable skills
@@ -22,6 +22,8 @@ Usage:
   skillminer repos                    List repos/directories with mineable history
   skillminer build [options]          Build global + per-repo skills from all logs
   skillminer improve [options]        Re-scan and refine existing skills with new sessions
+  skillminer export [--file <path>]   Bundle skills into a portable .skillpack.json
+  skillminer import <file>            Merge a .skillpack.json into local skills (append, deduped)
   skillminer mcp                      Run as an MCP server (stdio) for any MCP client
 
 Options:
@@ -44,6 +46,7 @@ function parse(argv) {
     options: {
       repo: { type: "string" },
       out: { type: "string" },
+      file: { type: "string" },
       import: { type: "string" },
       provider: { type: "string", multiple: true },
       llm: { type: "boolean", default: false },
@@ -111,7 +114,6 @@ async function main() {
     console.error(HELP);
     process.exit(1);
   }
-  void positionals;
 
   if (!cmd || values.help || cmd === "help" || cmd === "--help" || cmd === "-h") {
     console.log(HELP);
@@ -162,6 +164,29 @@ async function main() {
       console.log(summary.note);
       console.log(`Refreshed ${summary.written.length} skill file(s) under ${summary.outDir}`);
       if (values.install) installSkills(summary);
+      break;
+    }
+    case "export": {
+      const result = exportSkills({ outDir: values.out, file: values.file });
+      if (values.json) return void console.log(JSON.stringify(result, null, 2));
+      console.log(`Exported ${result.skills} skill(s) from ${result.skillsDir}`);
+      console.log(`Pack: ${path.resolve(result.file)}`);
+      console.log(`Import on another machine with: skillminer import ${path.basename(result.file)}`);
+      break;
+    }
+    case "import": {
+      const file = positionals[0] ?? values.file;
+      if (!file) {
+        console.error("skillminer: import needs a pack file — skillminer import <file.skillpack.json>");
+        process.exit(1);
+      }
+      const result = importSkills(path.resolve(file), { outDir: values.out });
+      if (values.json) return void console.log(JSON.stringify(result, null, 2));
+      console.log(
+        `Imported pack (exported ${result.exportedAt}): ${result.added} new skill(s), ${result.merged} merged into existing ones.`
+      );
+      console.log(`Skills dir: ${result.skillsDir}`);
+      if (values.install) installSkills({ outDir: result.skillsDir, repos: [] });
       break;
     }
     case "mcp":

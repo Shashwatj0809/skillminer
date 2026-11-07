@@ -94,3 +94,56 @@ test("groupByRepo groups by cwd", () => {
   assert.equal(groups.size, 1);
   assert.equal(groups.get("/Users/jane/projects/acme-api").length, 2);
 });
+
+test("export/import round-trip: pack moves skills and import appends without clobbering", async () => {
+  const { exportPack, importPack, readPack } = await import("../src/core/pack.js");
+  const conv = parseClaude(fixture("claude-code-session.jsonl"));
+  const analysis = analyzeConversations([conv], { redactOpts: { username: "jane" } });
+
+  const machineA = fs.mkdtempSync(path.join(os.tmpdir(), "skillminer-a-"));
+  const machineB = fs.mkdtempSync(path.join(os.tmpdir(), "skillminer-b-"));
+  const packFile = path.join(machineA, "skills.skillpack.json");
+  try {
+    writeSkills(buildGlobalSkills(analysis), machineA);
+
+    // export from machine A
+    const exported = exportPack(machineA, packFile);
+    assert.ok(exported.skills >= 2);
+    const pack = readPack(packFile);
+    assert.equal(pack.format, "skillminer-pack");
+
+    // import into empty machine B → all added
+    const first = importPack(packFile, machineB);
+    assert.equal(first.added, exported.skills);
+    assert.equal(first.merged, 0);
+
+    // machine B user adds a manual bullet, then re-imports → merged, both kept, no dupes
+    const target = path.join(machineB, "global", "user-preferences", "SKILL.md");
+    fs.appendFileSync(target, "- my machine-B manual note\n");
+    const bulletsBefore = (fs.readFileSync(target, "utf8").match(/^- /gm) ?? []).length;
+    const second = importPack(packFile, machineB);
+    assert.equal(second.added, 0);
+    assert.equal(second.merged, exported.skills);
+    const after = fs.readFileSync(target, "utf8");
+    assert.ok(after.includes("- my machine-B manual note"), "manual bullet survives import");
+    assert.equal((after.match(/^- /gm) ?? []).length, bulletsBefore, "re-import adds no duplicates");
+  } finally {
+    fs.rmSync(machineA, { recursive: true, force: true });
+    fs.rmSync(machineB, { recursive: true, force: true });
+  }
+});
+
+test("importPack rejects path-escaping pack entries", async () => {
+  const { importPack } = await import("../src/core/pack.js");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "skillminer-evil-"));
+  const evil = path.join(tmp, "evil.skillpack.json");
+  try {
+    fs.writeFileSync(
+      evil,
+      JSON.stringify({ format: "skillminer-pack", version: 1, skills: [{ dir: "../../escape", content: "x" }] })
+    );
+    assert.throws(() => importPack(evil, path.join(tmp, "skills")), /Unsafe skill path/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

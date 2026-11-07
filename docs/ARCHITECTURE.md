@@ -38,6 +38,7 @@ flowchart LR
     G & PS --> W["writeSkills()\nmerge-aware writer"]
     W --> OUT["~/.skillminer/skills/\nglobal/** and repos/**"]
     OUT -- "--install" --> CLAUDE["~/.claude/skills\n<repo>/.claude/skills"]
+    OUT <--> PK["pack.js\nexport/import .skillpack.json\n(move skills across machines)"]
 
     ST["state.js\n~/.skillminer/state.json\nfile fingerprints + last run"] <--> W
 ```
@@ -121,9 +122,20 @@ Emits the open `SKILL.md` convention — YAML frontmatter (`name`, `description`
 
 Strictly additive and off by default. When `SKILLMINER_LLM` is set (`anthropic` | `openai` | `ollama`), the already-extracted, already-redacted bullets — nothing else — are sent for a rewrite into crisper instructions. The `ollama` path (or `SKILLMINER_LLM_BASE_URL` pointed at any OpenAI-compatible server) keeps even that step fully local. Provider-agnostic by design: extraction never depends on any model.
 
-### 8. MCP server (`src/mcp/server.js`)
+### 8. Skill packs — export/import (`core/pack.js`)
 
-A zero-dependency implementation of the MCP stdio transport (newline-delimited JSON-RPC 2.0) covering `initialize`, `tools/list`, `tools/call`, `ping`. It exposes the same programmatic API the CLI uses, so any MCP client can scan, list repos, build, or improve — e.g. an agent working in a repo can regenerate that repo's skill mid-session.
+Skills travel between machines as a single `.skillpack.json`:
+
+```json
+{ "format": "skillminer-pack", "version": 1, "exportedAt": "...",
+  "skills": [ { "dir": "global/user-preferences", "content": "<SKILL.md text>" } ] }
+```
+
+`export` walks the skills directory and bundles every `SKILL.md` (already redacted by construction, so the pack is safe to move or share). `import` is **read-and-append**: new skills are added; existing ones go through the same section/bullet merger as `improve`, so local knowledge and hand edits survive and re-importing is idempotent. Pack entries are validated against path escape (`../`, absolute paths) before writing.
+
+### 9. MCP server (`src/mcp/server.js`)
+
+A zero-dependency implementation of the MCP stdio transport (newline-delimited JSON-RPC 2.0) covering `initialize`, `tools/list`, `tools/call`, `ping`. It exposes the same programmatic API the CLI uses — `scan_logs`, `list_repos`, `build_skills`, `improve_skills`, `export_skills`, `import_skills` — so any MCP client can scan, build, improve, or move skills between machines mid-session.
 
 ## Design decisions
 
@@ -147,6 +159,7 @@ skillminer/
 │   │   ├── analyze.js       heuristic miner
 │   │   ├── skills.js        SKILL.md builder + section/bullet merger
 │   │   ├── state.js         run-state fingerprints (~/.skillminer/state.json)
+│   │   ├── pack.js          portable .skillpack.json export/import
 │   │   └── llm.js           optional polish pass
 │   └── mcp/server.js        MCP stdio server
 ├── test/                    node:test suite + fixtures
